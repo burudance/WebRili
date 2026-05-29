@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2026 日历</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --line: #e7edf5;
+      --text: #1f2d3d;
+      --muted: #6b7a90;
+      --blue: #2f78ff;
+      --blue-soft: #eaf2ff;
+      --red: #e64b3c;
+      --orange: #f28b20;
+      --green: #22a06b;
+      --green-soft: #e9f8f1;
+      --orange-soft: #fff3e2;
+      --shadow: 0 18px 45px rgba(28, 55, 90, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      background:
+        linear-gradient(180deg, #eaf3ff 0, rgba(234, 243, 255, 0) 250px),
+        var(--bg);
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 28px auto;
+    }
+
+    .calendar-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 315px;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .main-panel,
+    .side-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .month-switch {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .icon-btn,
+    .today-btn,
+    .week-toggle,
+    .ghost-btn {
+      height: 36px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .icon-btn {
+      width: 36px;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .today-btn,
+    .week-toggle,
+    .ghost-btn {
+      padding: 0 14px;
+      white-space: nowrap;
+    }
+
+    .icon-btn:hover,
+    .today-btn:hover,
+    .week-toggle:hover,
+    .ghost-btn:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .month-title {
+      margin: 0;
+      min-width: 156px;
+      text-align: center;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .week-tip {
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      background: #fbfdff;
+    }
+
+    .week-tip strong {
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    .week-head,
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .week-head {
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .week-head div {
+      height: 42px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .week-head div:nth-child(n+6) {
+      color: var(--red);
+    }
+
+    .calendar-grid {
+      padding: 12px;
+      min-height: 646px;
+    }
+
+    .day-cell {
+      position: relative;
+      min-height: 104px;
+      padding: 9px 9px 8px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #fff;
+      transition: 0.15s ease;
+      overflow: hidden;
+    }
+
+    .day-cell:hover {
+      border-color: #b8d2ff;
+      background: #f8fbff;
+    }
+
+    .day-cell.other {
+      color: #b9c3d0;
+      background: #fbfcfe;
+    }
+
+    .day-cell.selected {
+      border-color: var(--blue);
+      box-shadow: inset 0 0 0 1px var(--blue);
+      background: #f8fbff;
+    }
+
+    .day-cell.today {
+      background: linear-gradient(180deg, #f2f7ff 0, #fff 80%);
+    }
+
+    .day-cell.today .solar {
+      color: #fff;
+      background: var(--blue);
+      border-radius: 50%;
+    }
+
+    .date-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .solar {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: #26384d;
+      line-height: 1;
+    }
+
+    .day-cell.weekend .solar,
+    .day-cell.holiday .solar {
+      color: var(--red);
+    }
+
+    .day-cell.today .solar {
+      color: #fff;
+    }
+
+    .today-mark {
+      color: var(--blue);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .lunar {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+      min-height: 22px;
+    }
+
+    .tag,
+    .work-tag {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      max-width: 100%;
+      padding: 0 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 20px;
+      white-space: nowrap;
+    }
+
+    .tag.festival {
+      color: var(--red);
+      background: #fff0ee;
+    }
+
+    .tag.term {
+      color: #1f76a8;
+      background: #eaf7ff;
+    }
+
+    .tag.special {
+      color: #8a5a12;
+      background: #fff7df;
+    }
+
+    .work-tag.off {
+      color: var(--green);
+      background: var(--green-soft);
+      font-weight: 700;
+    }
+
+    .work-tag.work {
+      color: var(--orange);
+      background: var(--orange-soft);
+      font-weight: 700;
+    }
+
+    .side-panel {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .date-card {
+      padding: 18px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f4f8ff, #fff);
+      border: 1px solid var(--line);
+    }
+
+    .date-card .big-day {
+      font-size: 56px;
+      line-height: 1;
+      color: var(--blue);
+      font-weight: 800;
+    }
+
+    .date-card .detail {
+      margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 14px;
+    }
+
+    .info-box {
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+    }
+
+    .info-title {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .almanac {
+      display: grid;
+      gap: 10px;
+    }
+
+    .almanac-row {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 8px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .almanac-row b {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .almanac-row.good b {
+      background: var(--green);
+    }
+
+    .almanac-row.bad b {
+      background: var(--red);
+    }
+
+    .countdown {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .countdown strong {
+      color: var(--red);
+      font-size: 22px;
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 930px) {
+      .calendar-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .side-panel .info-box:last-child {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        width: calc(100vw - 16px);
+        margin: 8px auto;
+      }
+
+      .toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .month-switch {
+        justify-content: space-between;
+      }
+
+      .month-title {
+        min-width: 120px;
+        font-size: 22px;
+      }
+
+      .actions {
+        justify-content: stretch;
+      }
+
+      .actions button {
+        flex: 1;
+      }
+
+      .week-tip {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .calendar-grid {
+        padding: 6px;
+        min-height: 520px;
+      }
+
+      .week-head {
+        padding: 0 6px;
+      }
+
+      .day-cell {
+        min-height: 86px;
+        padding: 6px 5px;
+        border-radius: 6px;
+      }
+
+      .solar {
+        width: 24px;
+        height: 24px;
+        font-size: 17px;
+      }
+
+      .lunar,
+      .tag,
+      .work-tag {
+        font-size: 11px;
+      }
+
+      .tag,
+      .work-tag {
+        height: 18px;
+        line-height: 18px;
+        padding: 0 4px;
+      }
+
+      .side-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="calendar-shell">
+      <div class="main-panel">
+        <header class="toolbar">
+          <div class="month-switch">
+            <button class="icon-btn" id="prevMonth" aria-label="上个月">‹</button>
+            <h1 class="month-title" id="monthTitle">2026年1月</h1>
+            <button class="icon-btn" id="nextMonth" aria-label="下个月">›</button>
+          </div>
+          <div class="actions">
+            <button class="today-btn" id="todayBtn">今天</button>
+            <button class="week-toggle" id="weekToggleBtn">设置本周为小周</button>
+            <button class="ghost-btn" id="resetWeekBtn" title="清除手动大小周设置">恢复默认</button>
+          </div>
+        </header>
+
+        <div class="week-tip">
+          <span id="weekTip">本周：大周（周六周日休）</span>
+          <span id="overrideTip">默认从 2026 年第 1 周开始大/小周交替</span>
+        </div>
+
+        <div class="week-head">
+          <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+
+      <aside class="side-panel">
+        <div class="date-card">
+          <div class="big-day" id="selectedDay">1</div>
+          <div class="detail" id="selectedDetail"></div>
+        </div>
+
+        <div class="info-box">
+          <h2 class="info-title">黄历</h2>
+          <div class="almanac">
+            <div class="almanac-row good"><b>宜</b><span id="goodThings"></span></div>
+            <div class="almanac-row bad"><b>忌</b><span id="badThings"></span></div>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <h2 class="info-title">岁时</h2>
+          <div class="mini-list">
+            <div id="ganzhiInfo">丙午年 马</div>
+            <div id="weekTypeInfo">当前周：大周</div>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <h2 class="info-title">节日倒计时</h2>
+          <div class="countdown" id="countdown"></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const MS_DAY = 86400000;
+    const today = startOfDay(new Date());
+    let viewDate = new Date(today.getFullYear() === 2026 ? today : new Date(2026, 0, 1));
+    viewDate.setDate(1);
+    let selectedDate = today.getFullYear() === 2026 ? today : new Date(2026, 0, 1);
+
+    const lunarInfo = [
+      0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,
+      0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,
+      0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,
+      0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,
+      0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,
+      0x06ca0,0x0b550,0x15355,0x04da0,0x0a5d0,0x14573,0x052d0,0x0a9a8,0x0e950,0x06aa0,
+      0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,
+      0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b6a0,0x195a6,
+      0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,
+      0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x05ac0,0x0ab60,0x096d5,0x092e0,
+      0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5,
+      0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930,
+      0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530,
+      0x05aa0,0x076a3,0x096d0,0x04bd7,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45,
+      0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0
+    ];
+
+    const gan = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+    const zhi = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+    const animals = ["鼠","牛","虎","兔","龙","蛇","马","羊","猴","鸡","狗","猪"];
+    const cnMonths = ["正月","二月","三月","四月","五月","六月","七月","八月","九月","十月","冬月","腊月"];
+    const cnDays = ["","初一","初二","初三","初四","初五","初六","初七","初八","初九","初十","十一","十二","十三","十四","十五","十六","十七","十八","十九","二十","廿一","廿二","廿三","廿四","廿五","廿六","廿七","廿八","廿九","三十"];
+    const weekNames = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
+
+    const solarTerms = {
+      "2026-01-05":"小寒","2026-01-20":"大寒","2026-02-04":"立春","2026-02-18":"雨水",
+      "2026-03-05":"惊蛰","2026-03-20":"春分","2026-04-05":"清明","2026-04-20":"谷雨",
+      "2026-05-05":"立夏","2026-05-21":"小满","2026-06-05":"芒种","2026-06-21":"夏至",
+      "2026-07-07":"小暑","2026-07-23":"大暑","2026-08-07":"立秋","2026-08-23":"处暑",
+      "2026-09-07":"白露","2026-09-23":"秋分","2026-10-08":"寒露","2026-10-23":"霜降",
+      "2026-11-07":"立冬","2026-11-22":"小雪","2026-12-07":"大雪","2026-12-22":"冬至"
+    };
+
+    const officialDays = {
+      "2026-01-01": { status: "off", name: "元旦" },
+      "2026-01-02": { status: "off", name: "元旦" },
+      "2026-01-03": { status: "off", name: "元旦" },
+      "2026-01-04": { status: "work", name: "调休" },
+      "2026-02-14": { status: "work", name: "调休" },
+      "2026-02-15": { status: "off", name: "春节" },
+      "2026-02-16": { status: "off", name: "除夕" },
+      "2026-02-17": { status: "off", name: "春节" },
+      "2026-02-18": { status: "off", name: "春节" },
+      "2026-02-19": { status: "off", name: "春节" },
+      "2026-02-20": { status: "off", name: "春节" },
+      "2026-02-21": { status: "off", name: "春节" },
+      "2026-02-22": { status: "off", name: "春节" },
+      "2026-02-23": { status: "off", name: "春节" },
+      "2026-02-28": { status: "work", name: "调休" },
+      "2026-04-04": { status: "off", name: "清明" },
+      "2026-04-05": { status: "off", name: "清明" },
+      "2026-04-06": { status: "off", name: "清明" },
+      "2026-05-01": { status: "off", name: "劳动节" },
+      "2026-05-02": { status: "off", name: "劳动节" },
+      "2026-05-03": { status: "off", name: "劳动节" },
+      "2026-05-04": { status: "off", name: "劳动节" },
+      "2026-05-05": { status: "off", name: "劳动节" },
+      "2026-05-09": { status: "work", name: "调休" },
+      "2026-06-19": { status: "off", name: "端午" },
+      "2026-06-20": { status: "off", name: "端午" },
+      "2026-06-21": { status: "off", name: "端午" },
+      "2026-09-20": { status: "work", name: "调休" },
+      "2026-09-25": { status: "off", name: "中秋" },
+      "2026-09-26": { status: "off", name: "中秋" },
+      "2026-09-27": { status: "off", name: "中秋" },
+      "2026-10-01": { status: "off", name: "国庆" },
+      "2026-10-02": { status: "off", name: "国庆" },
+      "2026-10-03": { status: "off", name: "国庆" },
+      "2026-10-04": { status: "off", name: "国庆" },
+      "2026-10-05": { status: "off", name: "国庆" },
+      "2026-10-06": { status: "off", name: "国庆" },
+      "2026-10-07": { status: "off", name: "国庆" },
+      "2026-10-10": { status: "work", name: "调休" }
+    };
+
+    const solarFestivals = {
+      "01-01": "元旦", "02-14": "情人节", "03-08": "妇女节", "03-12": "植树节",
+      "05-01": "劳动节", "05-04": "青年节", "06-01": "儿童节", "07-01": "建党节",
+      "08-01": "建军节", "09-10": "教师节", "10-01": "国庆节", "12-25": "圣诞节"
+    };
+
+    const lunarFestivals = {
+      "1-1": "春节", "1-15": "元宵节", "2-2": "龙抬头", "5-5": "端午节",
+      "7-7": "七夕", "8-15": "中秋节", "9-9": "重阳节", "12-8": "腊八节", "12-23": "小年"
+    };
+
+    const importantFestivals = [
+      { date: "2026-02-17", name: "春节" },
+      { date: "2026-06-19", name: "端午节" },
+      { date: "2026-09-25", name: "中秋节" },
+      { date: "2027-02-06", name: "春节" }
+    ];
+
+    const almanacSamples = [
+      { good: "祭祀、祈福、出行、会友", bad: "开仓、动土、远行" },
+      { good: "嫁娶、纳采、整理、入学", bad: "诉讼、安葬、破土" },
+      { good: "交易、签约、开市、求财", bad: "搬迁、栽种、探病" },
+      { good: "扫舍、修整、沐浴、订盟", bad: "嫁娶、开业、置产" },
+      { good: "出行、赴任、安床、纳财", bad: "动土、修造、伐木" },
+      { good: "会亲友、学习、求医、裁衣", bad: "开仓、词讼、安门" },
+      { good: "祈福、祭祖、入宅、交易", bad: "行丧、破土、远游" },
+      { good: "开市、立券、洽谈、整理", bad: "嫁娶、搬家、针灸" },
+      { good: "纳采、动工、出行、求嗣", bad: "安葬、作灶、置业" },
+      { good: "修饰垣墙、沐浴、休养", bad: "诸事不宜大动" }
+    ];
+
+    const defaultAnchor = new Date(2025, 11, 29);
+    const storageKey = "calendar-big-small-week-2026";
+    let weekOverride = readWeekOverride();
+
+    const grid = document.getElementById("calendarGrid");
+    const monthTitle = document.getElementById("monthTitle");
+    const weekTip = document.getElementById("weekTip");
+    const overrideTip = document.getElementById("overrideTip");
+    const weekToggleBtn = document.getElementById("weekToggleBtn");
+
+    document.getElementById("prevMonth").addEventListener("click", () => shiftMonth(-1));
+    document.getElementById("nextMonth").addEventListener("click", () => shiftMonth(1));
+    document.getElementById("todayBtn").addEventListener("click", goToday);
+    weekToggleBtn.addEventListener("click", setCurrentWeekOpposite);
+    document.getElementById("resetWeekBtn").addEventListener("click", resetWeekOverride);
+
+    render();
+
+    function render() {
+      monthTitle.textContent = `${viewDate.getFullYear()}年${viewDate.getMonth() + 1}月`;
+      renderGrid();
+      renderInfo();
+      renderWeekControls();
+    }
+
+    function renderGrid() {
+      grid.innerHTML = "";
+      const start = startOfWeek(new Date(viewDate.getFullYear(), viewDate.getMonth(), 1));
+      for (let i = 0; i < 42; i++) {
+        const date = addDays(start, i);
+        const key = dateKey(date);
+        const lunar = solarToLunar(date);
+        const official = officialDays[key];
+        const status = getDayStatus(date);
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        const tags = getTags(date, lunar);
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = [
+          "day-cell",
+          date.getMonth() !== viewDate.getMonth() ? "other" : "",
+          isWeekend ? "weekend" : "",
+          official?.status === "off" ? "holiday" : "",
+          sameDay(date, today) ? "today" : "",
+          sameDay(date, selectedDate) ? "selected" : ""
+        ].filter(Boolean).join(" ");
+        cell.addEventListener("click", () => {
+          selectedDate = startOfDay(date);
+          if (viewDate.getMonth() !== date.getMonth() || viewDate.getFullYear() !== date.getFullYear()) {
+            viewDate = new Date(date.getFullYear(), date.getMonth(), 1);
+          }
+          render();
+        });
+
+        const tagHtml = tags.map(tag => `<span class="tag ${tag.kind}">${tag.name}</span>`).join("");
+        const statusHtml = status ? `<span class="work-tag ${status.status}">${status.status === "off" ? "休" : "班"}</span>` : "";
+        const lunarText = lunar.day === 1 ? `${lunar.isLeap ? "闰" : ""}${cnMonths[lunar.month - 1]}` : cnDays[lunar.day];
+        cell.innerHTML = `
+          <div class="date-line">
+            <span class="solar">${date.getDate()}</span>
+            ${sameDay(date, today) ? '<span class="today-mark">今</span>' : statusHtml}
+          </div>
+          <div class="lunar">${lunarText}</div>
+          <div class="tags">${tagHtml}${sameDay(date, today) ? statusHtml : ""}</div>
+        `;
+        grid.appendChild(cell);
+      }
+    }
+
+    function renderInfo() {
+      const lunar = solarToLunar(selectedDate);
+      const selectedKey = dateKey(selectedDate);
+      const tags = getTags(selectedDate, lunar).map(item => item.name);
+      const almanac = almanacSamples[(lunar.month * 3 + lunar.day) % almanacSamples.length];
+      const gzYear = getGanzhiYear(lunar.year);
+      const nextFestival = getNextImportantFestival(selectedDate);
+      const selectedDetail = [
+        `${selectedDate.getFullYear()}年${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日 ${weekNames[selectedDate.getDay()]}`,
+        `${gzYear} ${animals[(lunar.year - 4) % 12]}年 ${lunar.isLeap ? "闰" : ""}${cnMonths[lunar.month - 1]}${cnDays[lunar.day]}`,
+        tags.length ? tags.join(" · ") : "平日"
+      ];
+
+      document.getElementById("selectedDay").textContent = selectedDate.getDate();
+      document.getElementById("selectedDetail").innerHTML = selectedDetail.join("<br>");
+      document.getElementById("goodThings").textContent = almanac.good;
+      document.getElementById("badThings").textContent = almanac.bad;
+      document.getElementById("ganzhiInfo").textContent = `${gzYear}年 ${animals[(lunar.year - 4) % 12]}`;
+      document.getElementById("weekTypeInfo").textContent = `当前周：${getWeekType(selectedDate) === "big" ? "大周（周六周日休）" : "小周（周日休，周六班）"}`;
+      document.getElementById("countdown").innerHTML = `<span>距离${nextFestival.name}</span><strong>${nextFestival.days}</strong><span>天</span>`;
+    }
+
+    function renderWeekControls() {
+      const type = getWeekType(selectedDate);
+      const text = type === "big" ? "大周（周六周日休）" : "小周（周日休，周六班）";
+      weekTip.innerHTML = `本周：<strong>${text}</strong>`;
+      weekToggleBtn.textContent = type === "big" ? "设置本周为小周" : "设置本周为大周";
+      if (weekOverride) {
+        overrideTip.textContent = `已从 ${weekOverride.start} 起按${weekOverride.type === "big" ? "大周" : "小周"}重新交替`;
+      } else {
+        overrideTip.textContent = "默认从 2026 年第 1 周开始大/小周交替";
+      }
+    }
+
+    function getTags(date, lunar) {
+      const key = dateKey(date);
+      const mmdd = key.slice(5);
+      const list = [];
+      const official = officialDays[key];
+      if (official && official.name !== "调休") list.push({ name: official.name, kind: "festival" });
+      if (solarTerms[key]) list.push({ name: solarTerms[key], kind: "term" });
+      if (solarFestivals[mmdd] && !list.some(item => sameFestivalName(item.name, solarFestivals[mmdd]))) {
+        list.push({ name: solarFestivals[mmdd], kind: "special" });
+      }
+      const lunarKey = `${lunar.month}-${lunar.day}`;
+      if (!lunar.isLeap && lunarFestivals[lunarKey] && !list.some(item => sameFestivalName(item.name, lunarFestivals[lunarKey]))) {
+        list.push({ name: lunarFestivals[lunarKey], kind: "festival" });
+      }
+      if (lunar.month === 12 && lunar.day === monthDays(lunar.year, 12)) {
+        list.push({ name: "除夕", kind: "festival" });
+      }
+      return list.slice(0, 3);
+    }
+
+    function sameFestivalName(a, b) {
+      return a === b || `${a}节` === b || a === `${b}节`;
+    }
+
+    function getDayStatus(date) {
+      const key = dateKey(date);
+      if (officialDays[key]) return officialDays[key];
+      if (date.getDay() === 0) return { status: "off", name: "周末" };
+      if (date.getDay() === 6) {
+        return getWeekType(date) === "big" ? { status: "off", name: "大周" } : { status: "work", name: "小周" };
+      }
+      return null;
+    }
+
+    function getWeekType(date) {
+      const weekStart = startOfWeek(date);
+      if (weekOverride && weekStart >= parseDate(weekOverride.start)) {
+        const diff = Math.floor((weekStart - parseDate(weekOverride.start)) / (MS_DAY * 7));
+        return diff % 2 === 0 ? weekOverride.type : oppositeWeek(weekOverride.type);
+      }
+      const diff = Math.floor((weekStart - defaultAnchor) / (MS_DAY * 7));
+      return Math.abs(diff % 2) === 0 ? "big" : "small";
+    }
+
+    function setCurrentWeekOpposite() {
+      const current = getWeekType(selectedDate);
+      const next = oppositeWeek(current);
+      weekOverride = { start: dateKey(startOfWeek(selectedDate)), type: next };
+      localStorage.setItem(storageKey, JSON.stringify(weekOverride));
+      render();
+    }
+
+    function resetWeekOverride() {
+      weekOverride = null;
+      localStorage.removeItem(storageKey);
+      render();
+    }
+
+    function readWeekOverride() {
+      try {
+        const data = JSON.parse(localStorage.getItem(storageKey));
+        if (data && data.start && (data.type === "big" || data.type === "small")) return data;
+      } catch (error) {}
+      return null;
+    }
+
+    function oppositeWeek(type) {
+      return type === "big" ? "small" : "big";
+    }
+
+    function shiftMonth(offset) {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1);
+      selectedDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), Math.min(selectedDate.getDate(), daysInMonth(viewDate)));
+      render();
+    }
+
+    function goToday() {
+      selectedDate = startOfDay(today);
+      viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      render();
+    }
+
+    function getNextImportantFestival(date) {
+      const base = startOfDay(date);
+      for (const item of importantFestivals) {
+        const target = parseDate(item.date);
+        if (target >= base) {
+          return { ...item, days: Math.round((target - base) / MS_DAY) };
+        }
+      }
+      return { name: "春节", days: 0 };
+    }
+
+    function getGanzhiYear(year) {
+      return `${gan[(year - 4) % 10]}${zhi[(year - 4) % 12]}`;
+    }
+
+    function solarToLunar(date) {
+      let offset = Math.floor((startOfDay(date) - new Date(1900, 0, 31)) / MS_DAY);
+      let year = 1900;
+      let temp = 0;
+      while (year < 2050 && offset > 0) {
+        temp = lYearDays(year);
+        offset -= temp;
+        year++;
+      }
+      if (offset < 0) {
+        offset += temp;
+        year--;
+      }
+
+      const leap = leapMonth(year);
+      let isLeap = false;
+      let month = 1;
+      while (month < 13 && offset > 0) {
+        if (leap > 0 && month === leap + 1 && !isLeap) {
+          month--;
+          isLeap = true;
+          temp = leapDays(year);
+        } else {
+          temp = monthDays(year, month);
+        }
+        if (isLeap && month === leap + 1) isLeap = false;
+        offset -= temp;
+        if (!isLeap) month++;
+      }
+      if (offset === 0 && leap > 0 && month === leap + 1) {
+        if (isLeap) {
+          isLeap = false;
+        } else {
+          isLeap = true;
+          month--;
+        }
+      }
+      if (offset < 0) {
+        offset += temp;
+        month--;
+      }
+      return { year, month, day: offset + 1, isLeap };
+    }
+
+    function lYearDays(year) {
+      let sum = 348;
+      for (let bit = 0x8000; bit > 0x8; bit >>= 1) {
+        sum += (lunarInfo[year - 1900] & bit) ? 1 : 0;
+      }
+      return sum + leapDays(year);
+    }
+
+    function leapDays(year) {
+      if (leapMonth(year)) return (lunarInfo[year - 1900] & 0x10000) ? 30 : 29;
+      return 0;
+    }
+
+    function leapMonth(year) {
+      return lunarInfo[year - 1900] & 0xf;
+    }
+
+    function monthDays(year, month) {
+      return (lunarInfo[year - 1900] & (0x10000 >> month)) ? 30 : 29;
+    }
+
+    function startOfDay(date) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+
+    function startOfWeek(date) {
+      const d = startOfDay(date);
+      const day = d.getDay() || 7;
+      d.setDate(d.getDate() - day + 1);
+      return d;
+    }
+
+    function addDays(date, days) {
+      const next = new Date(date);
+      next.setDate(next.getDate() + days);
+      return next;
+    }
+
+    function sameDay(a, b) {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
+    function dateKey(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function parseDate(key) {
+      const [y, m, d] = key.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function daysInMonth(date) {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    }
+  </script>
+</body>
+</html>
