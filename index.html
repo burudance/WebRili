@@ -208,7 +208,7 @@
       position: relative;
       min-height: 104px;
       padding: 9px 9px 8px;
-      border: 1px solid transparent;
+      border: 1px solid var(--line);
       border-radius: 8px;
       cursor: pointer;
       background: var(--cell);
@@ -217,20 +217,22 @@
     }
 
     body.dark .day-cell {
-      border-color: var(--cell);
+      border-color: var(--line);
       border-radius: 6px;
     }
 
     body.dark .day-cell.other {
-      border-color: var(--cell);
+      border-color: var(--line);
     }
 
     .day-cell:hover {
       border-color: #b8d2ff;
       background: #f8fbff;
+      box-shadow: inset 0 0 0 1px #b8d2ff;
     }
 
     body.dark .day-cell:not(.other):hover {
+      border-color: #5f83bd;
       background: #2f3a4f;
       box-shadow: inset 0 0 0 1px #5f83bd;
     }
@@ -242,6 +244,7 @@
     .day-cell.other {
       color: #b9c3d0;
       background: var(--cell-soft);
+      border-color: var(--line);
     }
 
     .day-cell.other .solar {
@@ -256,6 +259,42 @@
 
     .day-cell.today {
       background: linear-gradient(180deg, var(--blue-soft) 0, var(--cell) 80%);
+    }
+
+    .day-cell.official-holiday {
+      background: #fff0e6;
+      border-color: #f6cdbb;
+    }
+
+    .day-cell.official-holiday.selected {
+      border-color: var(--blue);
+      box-shadow: inset 0 0 0 1px var(--blue);
+    }
+
+    .day-cell.official-holiday.holiday-chain-prev {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
+    .day-cell.official-holiday.holiday-chain-next {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    body.dark .day-cell.official-holiday {
+      background: #3d2a2a;
+      border-color: #76504b;
+    }
+
+    body.dark .day-cell.official-holiday.selected {
+      border-color: var(--blue);
+      box-shadow: inset 0 0 0 1px var(--blue);
+    }
+
+    body.dark .day-cell.official-holiday:not(.other):hover {
+      border-color: #9a5a52;
+      background: #4a3131;
+      box-shadow: inset 0 0 0 1px #9a5a52;
     }
 
     .day-cell.today .solar {
@@ -889,11 +928,11 @@
     ];
 
     const defaultAnchor = startOfWeek(today);
-    const storageKey = "calendar-big-small-week-2026";
-    const weekEnabledKey = "calendar-week-feature-enabled";
+    const storageKey = "calendar-big-small-week-v2";
+    const weekEnabledKey = "calendar-week-feature-enabled-v2";
     const themeKey = "calendar-theme";
     let weekOverride = readWeekOverride();
-    let weekFeatureEnabled = localStorage.getItem(weekEnabledKey) !== "false";
+    let weekFeatureEnabled = localStorage.getItem(weekEnabledKey) === "true";
     let currentTheme = localStorage.getItem(themeKey) || "light";
     let tagRotationTick = 0;
     let tagRotationPausedUntil = 0;
@@ -943,6 +982,7 @@
         const official = officialDays[key];
         const status = getDayStatus(date);
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        const isOfficialHoliday = official?.status === "off";
         const tags = getTags(date, lunar);
         const activeTag = tags.length ? tags[tagRotationTick % tags.length] : null;
         const cell = document.createElement("button");
@@ -951,7 +991,9 @@
           "day-cell",
           date.getMonth() !== viewDate.getMonth() ? "other" : "",
           isWeekend ? "weekend" : "",
-          official?.status === "off" ? "holiday" : "",
+          isOfficialHoliday ? "holiday official-holiday" : "",
+          isOfficialHoliday && isAdjacentOfficialHoliday(date, -1) ? "holiday-chain-prev" : "",
+          isOfficialHoliday && isAdjacentOfficialHoliday(date, 1) ? "holiday-chain-next" : "",
           sameDay(date, today) ? "today" : "",
           sameDay(date, selectedDate) ? "selected" : ""
         ].filter(Boolean).join(" ");
@@ -1001,20 +1043,21 @@
       weekFeatureSwitch.checked = weekFeatureEnabled;
       setBigWeekBtn.disabled = !weekFeatureEnabled;
       setSmallWeekBtn.disabled = !weekFeatureEnabled;
-      setBigWeekBtn.classList.toggle("active", weekFeatureEnabled && getWeekType(selectedDate) === "big");
-      setSmallWeekBtn.classList.toggle("active", weekFeatureEnabled && getWeekType(selectedDate) === "small");
+      const currentWeekType = getWeekType(today);
+      setBigWeekBtn.classList.toggle("active", weekFeatureEnabled && currentWeekType === "big");
+      setSmallWeekBtn.classList.toggle("active", weekFeatureEnabled && currentWeekType === "small");
       if (!weekFeatureEnabled) {
         weekTip.innerHTML = `本周：<strong>大小周已关闭</strong>`;
         overrideTip.textContent = "仅保留法定节假日和调休的休/班标识";
         return;
       }
-      const type = getWeekType(selectedDate);
+      const type = currentWeekType;
       const text = type === "big" ? "大周" : "小周";
       weekTip.innerHTML = `本周：<strong>${text}</strong>`;
       if (weekOverride) {
-        overrideTip.textContent = `已从 ${weekOverride.start} 起按${weekOverride.type === "big" ? "大周" : "小周"}双向交替`;
+        overrideTip.textContent = `已从本周 ${weekOverride.start} 起按${weekOverride.type === "big" ? "大周" : "小周"}交替，节假日周末跳过`;
       } else {
-        overrideTip.textContent = `默认以本周 ${dateKey(defaultAnchor)} 为大周`;
+        overrideTip.textContent = `默认以本周 ${dateKey(defaultAnchor)} 为大周，节假日周末跳过`;
       }
     }
 
@@ -1058,7 +1101,8 @@
       const key = dateKey(date);
       if (officialDays[key]) return officialDays[key];
       if (!weekFeatureEnabled) return null;
-      if (startOfMonth(date) < startOfMonth(today)) return null;
+      if (isBeforeCurrentSystemMonth(date)) return null;
+      if (isHolidayWeekendWeek(startOfWeek(date))) return null;
       if (date.getDay() === 0) return { status: "off", name: "周末" };
       if (date.getDay() === 6) {
         return getWeekType(date) === "big" ? { status: "off", name: "大周" } : { status: "work", name: "小周" };
@@ -1066,21 +1110,45 @@
       return null;
     }
 
+    function isAdjacentOfficialHoliday(date, offset) {
+      const adjacent = addDays(date, offset);
+      if (startOfWeek(adjacent).getTime() !== startOfWeek(date).getTime()) return false;
+      return officialDays[dateKey(adjacent)]?.status === "off";
+    }
+
     function getWeekType(date) {
       const weekStart = startOfWeek(date);
       const anchor = weekOverride ? parseDate(weekOverride.start) : defaultAnchor;
       const anchorType = weekOverride ? weekOverride.type : "big";
-      const diff = Math.floor((weekStart - anchor) / (MS_DAY * 7));
-      return Math.abs(diff) % 2 === 0 ? anchorType : oppositeWeek(anchorType);
+      const ordinarySteps = countOrdinaryWeekendWeeksBetween(anchor, weekStart);
+      return Math.abs(ordinarySteps) % 2 === 0 ? anchorType : oppositeWeek(anchorType);
+    }
+
+    function countOrdinaryWeekendWeeksBetween(anchorWeekStart, targetWeekStart) {
+      if (sameDay(anchorWeekStart, targetWeekStart)) return 0;
+      const direction = targetWeekStart > anchorWeekStart ? 1 : -1;
+      let cursor = addDays(anchorWeekStart, direction * 7);
+      let count = 0;
+      while (direction > 0 ? cursor <= targetWeekStart : cursor >= targetWeekStart) {
+        if (!isHolidayWeekendWeek(cursor)) count += direction;
+        cursor = addDays(cursor, direction * 7);
+      }
+      return count;
+    }
+
+    function isHolidayWeekendWeek(weekStart) {
+      const saturday = addDays(weekStart, 5);
+      const sunday = addDays(weekStart, 6);
+      return Boolean(officialDays[dateKey(saturday)] || officialDays[dateKey(sunday)]);
     }
 
     function setCurrentWeekType(type) {
       if (!weekFeatureEnabled) return;
-      if (type === "big" && sameDay(startOfWeek(selectedDate), defaultAnchor)) {
+      if (type === "big") {
         weekOverride = null;
         localStorage.removeItem(storageKey);
       } else {
-        weekOverride = { start: dateKey(startOfWeek(selectedDate)), type };
+        weekOverride = { start: dateKey(defaultAnchor), type };
         localStorage.setItem(storageKey, JSON.stringify(weekOverride));
       }
       render();
@@ -1286,6 +1354,10 @@
 
     function startOfMonth(date) {
       return new Date(date.getFullYear(), date.getMonth(), 1);
+    }
+
+    function isBeforeCurrentSystemMonth(date) {
+      return startOfMonth(date) < startOfMonth(today);
     }
 
     function addDays(date, days) {
